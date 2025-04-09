@@ -159,6 +159,7 @@ elif page == "評価フォーム":
             """, (anon_id, name, now, fv, ri, pi, tav, tamv, psv, edv, score, comment_joined))
             conn.commit()
             st.success("記録が保存されました。")
+            
 elif page == "記録一覧とグラフ":
     st.title("記録の一覧と経時変化グラフ")
     df = pd.read_sql_query("SELECT * FROM shunt_records", conn)
@@ -243,47 +244,6 @@ elif page == "記録一覧とグラフ":
                         st.write(f"- {c}")
                 else:
                     st.success("異常所見は見られません")
-
-                if st.button("レポートを画像（PNG）として保存"):
-                    from io import BytesIO
-                    from PIL import Image
-                    png_buffer = BytesIO()
-                    fig, ax = plt.subplots(figsize=(8.3, 11.7))
-                    ax.axis('off')
-                    y = 1.0
-                    ax.text(0.01, y, "透析シャント評価レポート", fontsize=16, weight='bold', ha='left')
-                    y -= 0.06
-                    ax.text(0.01, y, f"患者名: {latest['name']}", fontsize=12, ha='left')
-                    y -= 0.04
-                    ax.text(0.01, y, f"出力日: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", fontsize=12, ha='left')
-                    y -= 0.06
-                    for i, row in report_df.iterrows():
-                        y -= 0.05
-                        line = f"{row['パラメータ']}：{row['値']}（基準{row['基準']} {row['方向']}）"
-                        ax.text(0.05, y, line, fontsize=11)
-                    y -= 0.08
-                    ax.text(0.01, y, "評価コメント", fontsize=13, weight='bold')
-                    y -= 0.05
-                    if comments:
-                        for c in comments:
-                            ax.text(0.05, y, f"・{c}", fontsize=11)
-                            y -= 0.04
-                    else:
-                        ax.text(0.05, y, "異常所見は見られません", fontsize=11, color='blue')
-                    fig.savefig(png_buffer, format="png")
-                    plt.close(fig)
-
-                    for f in fig_list:
-                        f.savefig(png_buffer, format="png")
-                        plt.close(f)
-
-                    png_buffer.seek(0)
-                    st.download_button(
-                        label="レポート画像をダウンロード",
-                        data=png_buffer,
-                        file_name=f"{latest['name']}_report.png",
-                        mime="image/png"
-                    )
 
             with col2:
                 st.markdown("### 経時変化グラフ")
