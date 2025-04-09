@@ -188,6 +188,8 @@ elif page == "記録一覧とグラフ":
                 })
                 st.dataframe(report_df, use_container_width=True)
 
+                fig_list = []
+
                 for i, row in report_df.iterrows():
                     param = row["パラメータ"]
                     val = row["値"]
@@ -222,6 +224,7 @@ elif page == "記録一覧とグラフ":
                     ax.set_title(f"{param} 評価")
                     ax.set_xlabel("測定値")
                     st.pyplot(fig)
+                    fig_list.append(fig)
 
                 st.caption("赤: 異常値 / 黄: カットオフ付近 / 青: 正常")
 
@@ -241,76 +244,46 @@ elif page == "記録一覧とグラフ":
                 else:
                     st.success("異常所見は見られません")
 
-                if st.button("レポートをPDFとして保存"):
-                    from matplotlib.backends.backend_pdf import PdfPages
-                    import tempfile
+                if st.button("レポートを画像（PNG）として保存"):
+                    from io import BytesIO
+                    from PIL import Image
+                    png_buffer = BytesIO()
+                    fig, ax = plt.subplots(figsize=(8.3, 11.7))
+                    ax.axis('off')
+                    y = 1.0
+                    ax.text(0.01, y, "透析シャント評価レポート", fontsize=16, weight='bold', ha='left')
+                    y -= 0.06
+                    ax.text(0.01, y, f"患者名: {latest['name']}", fontsize=12, ha='left')
+                    y -= 0.04
+                    ax.text(0.01, y, f"出力日: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", fontsize=12, ha='left')
+                    y -= 0.06
+                    for i, row in report_df.iterrows():
+                        y -= 0.05
+                        line = f"{row['パラメータ']}：{row['値']}（基準{row['基準']} {row['方向']}）"
+                        ax.text(0.05, y, line, fontsize=11)
+                    y -= 0.08
+                    ax.text(0.01, y, "評価コメント", fontsize=13, weight='bold')
+                    y -= 0.05
+                    if comments:
+                        for c in comments:
+                            ax.text(0.05, y, f"・{c}", fontsize=11)
+                            y -= 0.04
+                    else:
+                        ax.text(0.05, y, "異常所見は見られません", fontsize=11, color='blue')
+                    fig.savefig(png_buffer, format="png")
+                    plt.close(fig)
 
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
-                        pdf_path = tmpfile.name
+                    for f in fig_list:
+                        f.savefig(png_buffer, format="png")
+                        plt.close(f)
 
-                    with PdfPages(pdf_path) as pdf:
-                        for i, row in report_df.iterrows():
-                            param = row["パラメータ"]
-                            val = row["値"]
-                            base = row["基準"]
-                            direction = row["方向"]
-
-                            if param == "RI":
-                                xlim = (0, 1.0)
-                                xticks = np.arange(0, 1.1, 0.1)
-                            elif param == "PI":
-                                xlim = (0, 5.0)
-                                xticks = np.arange(0, 5.5, 0.5)
-                            else:
-                                xlim = (0, max(1.5 * val, base * 1.5))
-                                xticks = None
-
-                            fig, ax = plt.subplots(figsize=(8.3, 5.8))
-                            if direction == "以下":
-                                ax.axvspan(0, base * 0.9, color='red', alpha=0.2)
-                                ax.axvspan(base * 0.9, base, color='yellow', alpha=0.2)
-                                ax.axvspan(base, xlim[1], color='blue', alpha=0.1)
-                            else:
-                                ax.axvspan(0, base, color='blue', alpha=0.1)
-                                ax.axvspan(base, base * 1.1, color='yellow', alpha=0.2)
-                                ax.axvspan(base * 1.1, xlim[1], color='red', alpha=0.2)
-
-                            ax.scatter(val, 0, color='red', s=100, zorder=5)
-                            ax.set_xlim(xlim)
-                            if xticks is not None:
-                                ax.set_xticks(xticks)
-                            ax.set_title(f"{param} 評価")
-                            ax.set_xlabel("測定値")
-                            pdf.savefig(fig)
-                            plt.close()
-
-                        fig_comment, ax_comment = plt.subplots(figsize=(8.3, 5.8))
-                        ax_comment.axis('off')
-                        ax_comment.set_title("評価コメント", loc='left')
-                        for i, c in enumerate(comments):
-                            ax_comment.text(0.05, 0.9 - i*0.1, f"・{c}", fontsize=12)
-                        if not comments:
-                            ax_comment.text(0.05, 0.9, "異常所見は見られません", fontsize=12, color='blue')
-                        pdf.savefig(fig_comment)
-                        plt.close()
-
-                        for metric in ["FV", "RI", "PI", "TAV", "TAMV", "PSV", "EDV"]:
-                            fig_trend, ax_trend = plt.subplots(figsize=(8.3, 5.8))
-                            ax_trend.plot(df_filtered["date"], df_filtered[metric], marker="o")
-                            ax_trend.set_title(f"{metric} の推移")
-                            ax_trend.set_xlabel("日付")
-                            ax_trend.set_ylabel(metric)
-                            ax_trend.grid(True)
-                            pdf.savefig(fig_trend)
-                            plt.close()
-
-                    with open(pdf_path, "rb") as f:
-                        st.download_button(
-                            label="PDFレポートをダウンロード",
-                            data=f,
-                            file_name=f"{latest['name']}_shunt_report.pdf",
-                            mime="application/pdf"
-                        )
+                    png_buffer.seek(0)
+                    st.download_button(
+                        label="レポート画像をダウンロード",
+                        data=png_buffer,
+                        file_name=f"{latest['name']}_report.png",
+                        mime="image/png"
+                    )
 
             with col2:
                 st.markdown("### 経時変化グラフ")
