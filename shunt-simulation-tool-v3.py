@@ -90,6 +90,8 @@ if page == "評価フォーム":
     else:
         name = st.selectbox("過去の患者名から選択", df_names["name"].tolist())
 
+    tag = st.selectbox("特記事項", ["術前評価", "術後評価", "定期評価", "VAIVT前評価", "VAIVT後評価"])
+
     fv = st.number_input("FV（血流量, ml/min）", min_value=0.0, value=400.0)
     ri = st.number_input("RI（抵抗指数）", min_value=0.0, value=0.6)
     pi = st.number_input("PI（脈波指数）", min_value=0.0, value=1.2)
@@ -158,9 +160,9 @@ if page == "評価フォーム":
             else:
                 anon_id = str(uuid.uuid4())[:8]
             cursor.execute("""
-                INSERT INTO shunt_records (anon_id, name, date, FV, RI, PI, TAV, TAMV, PSV, EDV, score, comment)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (anon_id, name, now, fv, ri, pi, tav, tamv, psv, edv, score, comment_joined))
+                INSERT INTO shunt_records (anon_id, name, date, FV, RI, PI, TAV, TAMV, PSV, EDV, score, comment, tag)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (anon_id, name, now, fv, ri, pi, tav, tamv, psv, edv, score, comment_joined, tag))
             conn.commit()
             st.success("記録が保存されました。")
 
