@@ -166,7 +166,8 @@ if page == "評価フォーム":
             conn.commit()
             st.success("記録が保存されました。")
 
-elif page == "記録一覧とグラフ":
+# 記録一覧とグラフページでの経時変化グラフ使用例
+if page == "記録一覧とグラフ":
     st.title("記録の一覧と経時変化グラフ")
     df = pd.read_sql_query("SELECT * FROM shunt_records", conn)
     if not df.empty:
@@ -261,6 +262,7 @@ elif page == "記録一覧とグラフ":
                     ax2.set_xlabel("日付")
                     ax2.set_ylabel(metric)
                     ax2.grid(True)
+                    ax2 = format_xaxis_as_date(ax2, df_filtered)
                     st.pyplot(fig2)
 
         if st.button("グラフを表示"):
@@ -272,10 +274,10 @@ elif page == "記録一覧とグラフ":
                 ax.set_xlabel("記録日時")
                 ax.set_ylabel(metric)
                 ax.grid(True)
+                ax = format_xaxis_as_date(ax, df_filtered)
                 st.pyplot(fig)
     else:
         st.info("記録がまだありません。")
-
 # 箱ひげ図（中央値・外れ値強調・N数表示）関数
 def draw_boxplot_with_median_outliers(data, metric, category_col):
     fig, ax = plt.subplots(figsize=(6, 4))
