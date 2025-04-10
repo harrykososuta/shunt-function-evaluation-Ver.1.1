@@ -18,19 +18,21 @@ if not os.path.exists(DB_FILE):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS shunt_records (
-                        id INTEGER PRIMARY KEY,
-                        anon_id TEXT,
-                        name TEXT,
-                        date TEXT,
-                        FV REAL,
-                        RI REAL,
-                        PI REAL,
-                        TAV REAL,
-                        TAMV REAL,
-                        PSV REAL,
-                        EDV REAL,
-                        score INTEGER,
-                        comment TEXT)''')
+        id INTEGER PRIMARY KEY,
+        anon_id TEXT,
+        name TEXT,
+        date TEXT,
+        FV REAL,
+        RI REAL,
+        PI REAL,
+        TAV REAL,
+        TAMV REAL,
+        PSV REAL,
+        EDV REAL,
+        score INTEGER,
+        comment TEXT,
+        tag TEXT
+    )''')
     conn.commit()
 else:
     conn = sqlite3.connect(DB_FILE)
@@ -79,12 +81,15 @@ if page == "シミュレーションツール":
 
 elif page == "評価フォーム":
     st.title("シャント機能評価フォーム")
-    df_names = pd.read_sql_query("SELECT DISTINCT name FROM shunt_records WHERE name != ''", conn)
-    name_option = st.radio("患者名の入力方法", ["新規入力", "過去から選択"])
-    if name_option == "新規入力":
-        name = st.text_input("氏名（任意）※本名では記入しないでください")
+
+    input_method = st.radio("患者名の入力方法", ("新規入力", "過去から選択"))
+    if input_method == "新規入力":
+        name = st.text_input("患者氏名")
     else:
-        name = st.selectbox("過去の患者名から選択", df_names["name"].tolist())
+        existing_names = pd.read_sql_query("SELECT DISTINCT name FROM shunt_records", conn)["name"].tolist()
+        name = st.selectbox("患者氏名を選択", existing_names)
+
+    tag = st.selectbox("特記事項", ["術前評価", "術後評価", "定期評価", "VAIVT前評価", "VAIVT後評価"])
 
     fv = st.number_input("FV（血流量, ml/min）", min_value=0.0, value=400.0)
     ri = st.number_input("RI（抵抗指数）", min_value=0.0, value=0.6)
@@ -109,40 +114,9 @@ elif page == "評価フォーム":
         score += 1
         comments.append("EDVが40.4 cm/s以下 → 拡張期血流速度が低い")
 
-    TAVR = calculate_tavr(tav, tamv)
-    RI_PI = ri / pi if pi != 0 else 0
-
-    st.write("### 評価結果")
-    st.write(f"評価スコア: {score} / 4")
-    if score == 0:
-        st.success("シャント機能は正常です。経過観察が推奨されます。")
-    elif score in [1, 2]:
-        st.warning("シャント機能は要注意です。追加評価が必要です。")
-    else:
-        st.error("シャント不全のリスクが高いです。専門的な評価が必要です。")
-
-    if comments:
-        st.write("### 評価コメント")
-        for comment in comments:
-            st.write(f"- {comment}")
-
-    st.write("### 波形分類")
-    st.write("Ⅰ・Ⅱ型はシャント機能は問題なし")
-    st.write("Ⅲ型は50％程度の狭窄があるため細かく精査")
-    st.write("Ⅳ型はVAIVTを提案を念頭に精査")
-    st.write("Ⅴ型はシャント閉塞している可能性が高い")
-
-    st.write("### TAVRの算出")
-    st.write(f"TAVR: {TAVR:.2f}")
-    st.write("### RI/PI の算出")
-    st.write(f"RI/PI: {RI_PI:.2f}")
-
-    st.write("### 追加コメント")
-    st.write("吻合部付近に2.0mmを超える分岐血管がある場合は遮断試験を行ってください")
-
     if st.button("記録を保存"):
         if name.strip() == "":
-            st.warning("氏名を入力してください（匿名可・本名以外でOK）")
+            st.warning("氏名を入力してください")
         else:
             now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             comment_joined = "; ".join(comments)
@@ -154,12 +128,12 @@ elif page == "評価フォーム":
             else:
                 anon_id = str(uuid.uuid4())[:8]
             cursor.execute("""
-                INSERT INTO shunt_records (anon_id, name, date, FV, RI, PI, TAV, TAMV, PSV, EDV, score, comment)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (anon_id, name, now, fv, ri, pi, tav, tamv, psv, edv, score, comment_joined))
+                INSERT INTO shunt_records (anon_id, name, date, FV, RI, PI, TAV, TAMV, PSV, EDV, score, comment, tag)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (anon_id, name, now, fv, ri, pi, tav, tamv, psv, edv, score, comment_joined, tag))
             conn.commit()
             st.success("記録が保存されました。")
-            
+
 elif page == "記録一覧とグラフ":
     st.title("記録の一覧と経時変化グラフ")
     df = pd.read_sql_query("SELECT * FROM shunt_records", conn)
@@ -270,6 +244,7 @@ elif page == "記録一覧とグラフ":
     else:
         st.info("記録がまだありません。")
 
+# ページ：患者管理
 elif page == "患者管理":
     st.title("患者管理リスト")
     df = pd.read_sql_query("SELECT * FROM shunt_records", conn)
@@ -293,28 +268,29 @@ elif page == "患者管理":
                 ax.grid(True)
                 st.pyplot(fig)
 
-        st.markdown("### 氏名の修正（氏名単位）")
-        unique_names = df["name"].dropna().unique().tolist()
-        edit_target_name = st.selectbox("修正対象の氏名", unique_names)
-        new_name = st.text_input("新しい氏名", value=edit_target_name)
+        st.write("### 氏名の修正（ID単位）")
+        editable_ids = patient_data["id"].tolist()
+        selected_edit_id = st.selectbox("修正する記録ID", editable_ids)
+        new_name = st.text_input("新しい氏名", value=selected_name)
         if st.button("氏名を更新"):
             cursor = conn.cursor()
-            cursor.execute("UPDATE shunt_records SET name = ? WHERE name = ?", (new_name, edit_target_name))
+            cursor.execute("UPDATE shunt_records SET name = ? WHERE id = ?", (new_name, selected_edit_id))
             conn.commit()
             st.success("氏名を更新しました。ページを再読み込みしてください。")
 
-        st.markdown("### 記録の削除（氏名単位）")
-        delete_target_name = st.selectbox("削除する氏名", unique_names, key="delete")
+        st.write("### 記録の削除（ID単位）")
+        delete_id = st.selectbox("削除する記録ID", editable_ids)
         if st.button("記録を削除"):
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM shunt_records WHERE name = ?", (delete_target_name,))
+            cursor.execute("DELETE FROM shunt_records WHERE id = ?", (delete_id,))
             conn.commit()
             st.success("記録を削除しました。ページを再読み込みしてください。")
     else:
         st.info("現在記録されている患者はいません。")
 
+# ページ：患者データ一覧
 elif page == "患者データ一覧":
-    st.title("患者データ一覧（ボタン形式）")
+    st.title("患者データ一覧（ボタン形式 + 特記事項比較）")
     df = pd.read_sql_query("SELECT * FROM shunt_records", conn)
     if not df.empty:
         unique_names = df["name"].dropna().unique().tolist()
@@ -323,5 +299,42 @@ elif page == "患者データ一覧":
                 patient_data = df[df["name"] == name].sort_values(by="date")
                 st.write(f"### {name} の記録一覧")
                 st.dataframe(patient_data)
+
+        st.markdown("---")
+        st.subheader("📊 特記事項カテゴリでの比較")
+        categories = ["術前評価", "術後評価", "定期評価", "VAIVT前評価", "VAIVT後評価"]
+        selected_category = st.selectbox("特記事項を選択して記録を表示", categories, key="cat_view")
+        cat_data = df[df["tag"] == selected_category]
+        st.write(f"#### {selected_category} の記録一覧")
+        st.dataframe(cat_data)
+
+        compare_categories = st.multiselect("比較したいカテゴリを選択（2つまで）", categories)
+        if len(compare_categories) == 2:
+            compare_data = df[df["tag"].isin(compare_categories)]
+            metrics = ["FV", "RI", "PI", "TAV", "TAMV", "PSV", "EDV"]
+            for metric in metrics:
+                fig = draw_boxplot_with_median_outliers(compare_data, metric, "tag")
+                st.pyplot(fig)
     else:
         st.info("患者データが存在しません。")
+
+# 箱ひげ図（中央値・外れ値強調・N数表示）関数
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+def draw_boxplot_with_median_outliers(data, metric, category_col):
+    fig, ax = plt.subplots(figsize=(6, 4))
+    sns.boxplot(x=category_col, y=metric, data=data, ax=ax,
+                medianprops={"color": "black", "linewidth": 2},
+                flierprops=dict(marker='o', markerfacecolor='red', markersize=6, linestyle='none'))
+
+    # N数（サンプル数）をラベルとして追加
+    group_counts = data[category_col].value_counts().to_dict()
+    xtick_labels = [f"{label}\n(n={group_counts.get(label.get_text(), 0)})" for label in ax.get_xticklabels()]
+    ax.set_xticklabels(xtick_labels)
+
+    ax.set_title(f"{metric} の比較")
+    ax.set_xlabel("評価カテゴリ")
+    ax.set_ylabel(metric)
+    plt.tight_layout()
+    return fig
