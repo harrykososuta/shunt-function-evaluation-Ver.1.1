@@ -353,21 +353,22 @@ if page == "患者データ一覧":
     df = pd.read_sql_query("SELECT * FROM shunt_records", conn)
     if not df.empty:
         unique_names = df["name"].dropna().unique().tolist()
-        for name in unique_names:
-            if st.button(f"{name} の記録を見る"):
-                patient_data = df[df["name"] == name].sort_values(by="date")
-                st.write(f"### {name} の記録一覧")
-                st.dataframe(patient_data)
 
-                if st.button(f"{name} の統計を表示"):
-                    st.subheader("📊 各項目の統計（平均・標準偏差）")
-                    metrics = ["FV", "RI", "PI", "TAV", "TAMV", "PSV", "EDV"]
-                    stats_data = {
-                        "項目": metrics,
-                        "平均": [round(np.mean(patient_data[m]), 2) for m in metrics],
-                        "標準偏差": [round(np.std(patient_data[m], ddof=1), 2) for m in metrics]
-                    }
-                    st.dataframe(pd.DataFrame(stats_data))
+        if st.button("患者記録をみる"):
+            selected_name = st.selectbox("患者を選択", unique_names, key="select_patient")
+            patient_data = df[df["name"] == selected_name].sort_values(by="date")
+            st.write(f"### {selected_name} の記録一覧")
+            st.dataframe(patient_data)
+
+            if st.button(f"{selected_name} の統計を表示"):
+                st.subheader("📊 各項目の統計（平均・標準偏差）")
+                metrics = ["FV", "RI", "PI", "TAV", "TAMV", "PSV", "EDV"]
+                stats_data = {
+                    "項目": metrics,
+                    "平均": [round(np.mean(patient_data[m]), 2) for m in metrics],
+                    "標準偏差": [round(np.std(patient_data[m], ddof=1), 2) for m in metrics]
+                }
+                st.dataframe(pd.DataFrame(stats_data))
 
         st.markdown("---")
         st.subheader("📊 特記事項カテゴリでの比較")
@@ -401,3 +402,4 @@ if page == "患者データ一覧":
                 st.pyplot(fig)
     else:
         st.info("患者データが存在しません。")
+
