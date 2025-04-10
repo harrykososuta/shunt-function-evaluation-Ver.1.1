@@ -9,6 +9,12 @@ import uuid
 import os
 import seaborn as sns
 
+# 経時変化グラフ用フォーマット関数（x軸を日付のみ表示）
+def format_xaxis_as_date(ax, df):
+    ax.set_xticks(df['date'])
+    ax.set_xticklabels(df['date'].dt.strftime('%Y-%m-%d'), rotation=45)
+    return ax
+
 # ページ設定
 st.set_page_config(page_title="シャント機能評価", layout="wide")
 matplotlib.rcParams['font.family'] = 'MS Gothic'
