@@ -8,6 +8,7 @@ import datetime
 import uuid
 import os
 import seaborn as sns
+from scipy.stats import mannwhitneyu
 
 # 経時変化グラフ用フォーマット関数（x軸を日付のみ表示）
 def format_xaxis_as_date(ax, df):
