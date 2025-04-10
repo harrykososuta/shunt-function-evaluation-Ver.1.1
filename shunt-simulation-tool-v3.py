@@ -7,6 +7,7 @@ import sqlite3
 import datetime
 import uuid
 import os
+import seaborn as sns
 
 # ページ設定
 st.set_page_config(page_title="シャント機能評価", layout="wide")
@@ -244,6 +245,25 @@ elif page == "記録一覧とグラフ":
     else:
         st.info("記録がまだありません。")
 
+# 箱ひげ図（中央値・外れ値強調・N数表示）関数
+
+def draw_boxplot_with_median_outliers(data, metric, category_col):
+    fig, ax = plt.subplots(figsize=(6, 4))
+    sns.boxplot(x=category_col, y=metric, data=data, ax=ax,
+                medianprops={"color": "black", "linewidth": 2},
+                flierprops=dict(marker='o', markerfacecolor='red', markersize=6, linestyle='none'))
+
+    # N数（サンプル数）をラベルとして追加
+    group_counts = data[category_col].value_counts().to_dict()
+    xtick_labels = [f"{label.get_text()}\n(n={group_counts.get(label.get_text(), 0)})" for label in ax.get_xticklabels()]
+    ax.set_xticklabels(xtick_labels)
+
+    ax.set_title(f"{metric} の比較")
+    ax.set_xlabel("評価カテゴリ")
+    ax.set_ylabel(metric)
+    plt.tight_layout()
+    return fig
+
 # ページ：患者管理
 elif page == "患者管理":
     st.title("患者管理リスト")
@@ -317,24 +337,3 @@ elif page == "患者データ一覧":
                 st.pyplot(fig)
     else:
         st.info("患者データが存在しません。")
-
-# 箱ひげ図（中央値・外れ値強調・N数表示）関数
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-def draw_boxplot_with_median_outliers(data, metric, category_col):
-    fig, ax = plt.subplots(figsize=(6, 4))
-    sns.boxplot(x=category_col, y=metric, data=data, ax=ax,
-                medianprops={"color": "black", "linewidth": 2},
-                flierprops=dict(marker='o', markerfacecolor='red', markersize=6, linestyle='none'))
-
-    # N数（サンプル数）をラベルとして追加
-    group_counts = data[category_col].value_counts().to_dict()
-    xtick_labels = [f"{label.get_text()}\n(n={group_counts.get(label.get_text(), 0)})" for label in ax.get_xticklabels()]
-    ax.set_xticklabels(xtick_labels)
-
-    ax.set_title(f"{metric} の比較")
-    ax.set_xlabel("評価カテゴリ")
-    ax.set_ylabel(metric)
-    plt.tight_layout()
-    return fig
