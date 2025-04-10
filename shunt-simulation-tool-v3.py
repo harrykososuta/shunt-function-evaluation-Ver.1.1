@@ -80,7 +80,8 @@ if page == "シミュレーションツール":
     st.write(f"TAMV: {TAMV:.2f} cm/s")
     st.write(f"TAVR: {TAVR:.2f}")
 
-elif page == "評価フォーム":
+# ページ：評価フォーム
+if page == "評価フォーム":
     st.title("シャント機能評価フォーム")
 
     input_method = st.radio("患者名の入力方法", ("新規入力", "過去から選択"))
@@ -114,6 +115,13 @@ elif page == "評価フォーム":
     if edv <= 40.4:
         score += 1
         comments.append("EDVが40.4 cm/s以下 → 拡張期血流速度が低い")
+
+    st.markdown("### 評価コメント")
+    if comments:
+        for c in comments:
+            st.write(f"- {c}")
+    else:
+        st.success("異常所見は見られません")
 
     if st.button("記録を保存"):
         if name.strip() == "":
