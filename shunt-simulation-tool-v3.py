@@ -246,7 +246,6 @@ elif page == "記録一覧とグラフ":
         st.info("記録がまだありません。")
 
 # 箱ひげ図（中央値・外れ値強調・N数表示）関数
-
 def draw_boxplot_with_median_outliers(data, metric, category_col):
     fig, ax = plt.subplots(figsize=(6, 4))
     sns.boxplot(x=category_col, y=metric, data=data, ax=ax,
@@ -265,7 +264,7 @@ def draw_boxplot_with_median_outliers(data, metric, category_col):
     return fig
 
 # ページ：患者管理
-elif page == "患者管理":
+if page == "患者管理":
     st.title("患者管理リスト")
     df = pd.read_sql_query("SELECT * FROM shunt_records", conn)
     if not df.empty:
