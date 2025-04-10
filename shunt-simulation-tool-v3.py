@@ -83,15 +83,12 @@ if page == "シミュレーションツール":
 # ページ：評価フォーム
 if page == "評価フォーム":
     st.title("シャント機能評価フォーム")
-
-    input_method = st.radio("患者名の入力方法", ("新規入力", "過去から選択"))
-    if input_method == "新規入力":
-        name = st.text_input("患者氏名")
+    df_names = pd.read_sql_query("SELECT DISTINCT name FROM shunt_records WHERE name != ''", conn)
+    name_option = st.radio("患者名の入力方法", ["新規入力", "過去から選択"])
+    if name_option == "新規入力":
+        name = st.text_input("氏名（任意）※本名では記入しないでください")
     else:
-        existing_names = pd.read_sql_query("SELECT DISTINCT name FROM shunt_records", conn)["name"].tolist()
-        name = st.selectbox("患者氏名を選択", existing_names)
-
-    tag = st.selectbox("特記事項", ["術前評価", "術後評価", "定期評価", "VAIVT前評価", "VAIVT後評価"])
+        name = st.selectbox("過去の患者名から選択", df_names["name"].tolist())
 
     fv = st.number_input("FV（血流量, ml/min）", min_value=0.0, value=400.0)
     ri = st.number_input("RI（抵抗指数）", min_value=0.0, value=0.6)
@@ -116,16 +113,40 @@ if page == "評価フォーム":
         score += 1
         comments.append("EDVが40.4 cm/s以下 → 拡張期血流速度が低い")
 
-    st.markdown("### 評価コメント")
-    if comments:
-        for c in comments:
-            st.write(f"- {c}")
+    TAVR = calculate_tavr(tav, tamv)
+    RI_PI = ri / pi if pi != 0 else 0
+
+    st.write("### 評価結果")
+    st.write(f"評価スコア: {score} / 4")
+    if score == 0:
+        st.success("シャント機能は正常です。経過観察が推奨されます。")
+    elif score in [1, 2]:
+        st.warning("シャント機能は要注意です。追加評価が必要です。")
     else:
-        st.success("異常所見は見られません")
+        st.error("シャント不全のリスクが高いです。専門的な評価が必要です。")
+
+    if comments:
+        st.write("### 評価コメント")
+        for comment in comments:
+            st.write(f"- {comment}")
+
+    st.write("### 波形分類")
+    st.write("Ⅰ・Ⅱ型はシャント機能は問題なし")
+    st.write("Ⅲ型は50％程度の狭窄があるため細かく精査")
+    st.write("Ⅳ型はVAIVTを提案を念頭に精査")
+    st.write("Ⅴ型はシャント閉塞している可能性が高い")
+
+    st.write("### TAVRの算出")
+    st.write(f"TAVR: {TAVR:.2f}")
+    st.write("### RI/PI の算出")
+    st.write(f"RI/PI: {RI_PI:.2f}")
+
+    st.write("### 追加コメント")
+    st.write("吻合部付近に2.0mmを超える分岐血管がある場合は遮断試験を行ってください")
 
     if st.button("記録を保存"):
         if name.strip() == "":
-            st.warning("氏名を入力してください")
+            st.warning("氏名を入力してください（匿名可・本名以外でOK）")
         else:
             now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             comment_joined = "; ".join(comments)
@@ -137,9 +158,9 @@ if page == "評価フォーム":
             else:
                 anon_id = str(uuid.uuid4())[:8]
             cursor.execute("""
-                INSERT INTO shunt_records (anon_id, name, date, FV, RI, PI, TAV, TAMV, PSV, EDV, score, comment, tag)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (anon_id, name, now, fv, ri, pi, tav, tamv, psv, edv, score, comment_joined, tag))
+                INSERT INTO shunt_records (anon_id, name, date, FV, RI, PI, TAV, TAMV, PSV, EDV, score, comment)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (anon_id, name, now, fv, ri, pi, tav, tamv, psv, edv, score, comment_joined))
             conn.commit()
             st.success("記録が保存されました。")
 
