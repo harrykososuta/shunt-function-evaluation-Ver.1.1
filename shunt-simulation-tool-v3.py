@@ -347,7 +347,7 @@ if page == "患者管理":
         st.info("現在記録されている患者はいません。")
 
 # ページ：患者データ一覧
-elif page == "患者データ一覧":
+if page == "患者データ一覧":
     st.title("患者データ一覧（ボタン形式 + 特記事項比較）")
     df = pd.read_sql_query("SELECT * FROM shunt_records", conn)
     if not df.empty:
@@ -357,6 +357,16 @@ elif page == "患者データ一覧":
                 patient_data = df[df["name"] == name].sort_values(by="date")
                 st.write(f"### {name} の記録一覧")
                 st.dataframe(patient_data)
+
+                if st.button(f"{name} の統計を表示"):
+                    st.subheader("📊 各項目の統計（平均・標準偏差）")
+                    metrics = ["FV", "RI", "PI", "TAV", "TAMV", "PSV", "EDV"]
+                    stats_data = {
+                        "項目": metrics,
+                        "平均": [round(np.mean(patient_data[m]), 2) for m in metrics],
+                        "標準偏差": [round(np.std(patient_data[m], ddof=1), 2) for m in metrics]
+                    }
+                    st.dataframe(pd.DataFrame(stats_data))
 
         st.markdown("---")
         st.subheader("📊 特記事項カテゴリでの比較")
@@ -369,8 +379,23 @@ elif page == "患者データ一覧":
         compare_categories = st.multiselect("比較したいカテゴリを選択（2つまで）", categories)
         if len(compare_categories) == 2:
             compare_data = df[df["tag"].isin(compare_categories)]
-            metrics = ["FV", "RI", "PI", "TAV", "TAMV", "PSV", "EDV"]
-            for metric in metrics:
+            if st.button("有意差を検定"):
+                st.markdown("#### ※Mann-Whitney U検定")
+                metrics = ["FV", "RI", "PI", "TAV", "TAMV", "PSV", "EDV"]
+                p_results = {"項目": [], "p値": []}
+
+                for metric in metrics:
+                    group1 = compare_data[compare_data["tag"] == compare_categories[0]][metric]
+                    group2 = compare_data[compare_data["tag"] == compare_categories[1]][metric]
+                    if len(group1) > 0 and len(group2) > 0:
+                        stat, p = mannwhitneyu(group1, group2, alternative='two-sided')
+                        p_results["項目"].append(metric)
+                        p_results["p値"].append(round(p, 4))
+                st.dataframe(pd.DataFrame(p_results))
+
+            st.markdown("---")
+            st.subheader("📈 箱ひげ図による比較")
+            for metric in ["FV", "RI", "PI", "TAV", "TAMV", "PSV", "EDV"]:
                 fig = draw_boxplot_with_median_outliers(compare_data, metric, "tag")
                 st.pyplot(fig)
     else:
