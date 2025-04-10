@@ -276,10 +276,12 @@ elif page == "患者管理":
     if not df.empty:
         name_counts = df.groupby("name")["id"].count().reset_index().rename(columns={"id": "記録数"})
         st.dataframe(name_counts)
+
         selected_name = st.selectbox("患者氏名を選択", name_counts["name"].unique())
         patient_data = df[df["name"] == selected_name].sort_values(by="date")
         st.write(f"### {selected_name} の記録一覧")
         st.dataframe(patient_data)
+
         if st.button("この患者のグラフを表示"):
             metrics = ["FV", "RI", "PI", "TAV", "TAMV", "PSV", "EDV"]
             for metric in metrics:
@@ -290,20 +292,22 @@ elif page == "患者管理":
                 ax.set_ylabel(metric)
                 ax.grid(True)
                 st.pyplot(fig)
-        st.write("### 氏名の修正（ID単位）")
-        editable_ids = patient_data["id"].tolist()
-        selected_edit_id = st.selectbox("修正する記録ID", editable_ids)
-        new_name = st.text_input("新しい氏名", value=selected_name)
+
+        st.markdown("### 氏名の修正（氏名単位）")
+        unique_names = df["name"].dropna().unique().tolist()
+        edit_target_name = st.selectbox("修正対象の氏名", unique_names)
+        new_name = st.text_input("新しい氏名", value=edit_target_name)
         if st.button("氏名を更新"):
             cursor = conn.cursor()
-            cursor.execute("UPDATE shunt_records SET name = ? WHERE id = ?", (new_name, selected_edit_id))
+            cursor.execute("UPDATE shunt_records SET name = ? WHERE name = ?", (new_name, edit_target_name))
             conn.commit()
             st.success("氏名を更新しました。ページを再読み込みしてください。")
-        st.write("### 記録の削除（ID単位）")
-        delete_id = st.selectbox("削除する記録ID", editable_ids)
+
+        st.markdown("### 記録の削除（氏名単位）")
+        delete_target_name = st.selectbox("削除する氏名", unique_names, key="delete")
         if st.button("記録を削除"):
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM shunt_records WHERE id = ?", (delete_id,))
+            cursor.execute("DELETE FROM shunt_records WHERE name = ?", (delete_target_name,))
             conn.commit()
             st.success("記録を削除しました。ページを再読み込みしてください。")
     else:
